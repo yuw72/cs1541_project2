@@ -12,15 +12,11 @@
 #include <inttypes.h>
 #include <arpa/inet.h>
 #include "CPU.h" 
-#include "cache.h"
+#include "original_cache.h"
 
 //cache statistics
 unsigned int I_accesses = 0;
 unsigned int I_misses = 0;
-unsigned int D_misses = 0;
-unsigned int D_accesses = 0;
-
-
 
 int main(int argc, char **argv)
 {
@@ -47,10 +43,6 @@ int main(int argc, char **argv)
   unsigned int I_assoc = 4;
   unsigned int I_bsize = 16; 
   unsigned int miss_penalty = 10;
-  unsigned int D_size = 2 ; 
-  unsigned int D_assoc = 4;
-  unsigned int D_bsize = 16; 
-  unsigned int D_miss_penalty = 10;
 
   fprintf(stdout, "\n ** opening file %s\n", trace_file_name);
 
@@ -86,47 +78,7 @@ int main(int argc, char **argv)
       if(!size){    /* if no more instructions in trace, reduce flush_counter */
         flush_counter--;
       }
-	  else {	
-	  		if(busy_writeBack ==0)
-	  			if(cache_access()==0)
-	  				if(MEM.type != ti_STORE||MEM.type != ti_LOAD)
-	  					availability = 1;
-	  				else if(MEM.type == ti_LOAD && MEM.type == ti_STORE)
-	  					int hit_level = D_cache_access(r/w)
-	  					if( hit_level==0) availability =1;
-	  					else if(hit_level==2) {availability  = 1; cycle++;}
-	  					else availability=0;
-	  			else availability = 0;
-	  		else {change to check_cahce();}
-
-		  		int count = D_miss_penalty;
-	  	////////////whenever L2 is avaliable/////////
-	  		if(write_buffer_num!=0 && availability==1)
-	  		{
-	  			busy_writeBack=1;  delay =1; 
-	  			if(stall == 1) 
-	  				dequeue(); jump_cycle(count); busy_writeBack = 0; 
-	  			  else
-	  				count--;
-	  			if (count ==0) {busy_writeBack=0; stall=0; dequeue();}
-	  		}
-	  	
-	  	if(busy_writeBack==1 && availability == 0)
-	  		stall_pipeline = 1; 
-	  		stall = 1;
-	  		availability=1;
-	  	if(avai = 0 && busy_wBack==0)
-	  		if(delay == 1) delay =0; cycle++;
-
-
-
-
-
-
-
-
-
-	  									/* copy trace entry into IF stage */
+	  else {										/* copy trace entry into IF stage */
 		  memcpy(&IF, tr_entry, sizeof(IF));
 		  if (cache_access(I_cache, IF.PC, 0) > 0)	/* stall the pipe if instruction fetch returns a miss */
 		  {
@@ -134,12 +86,6 @@ int main(int argc, char **argv)
 			  I_misses++;
 		  }
 		  I_accesses++;
-		  //if((MEM.type == ti_LOAD || MEM.type == ti_STORE) && STOREdata_access(D_cache, MEM.PC, 0) > 0 )
-		  //{
-		  	  //cycle_number = cycle_number + D_miss_penalty;
-		  	  //D_misses++;
-  		  //}
-  		  //D_accesses++;
 	  }
 
       //printf("==============================================================================\n");
@@ -185,6 +131,7 @@ int main(int argc, char **argv)
 		 }
 	 } 
   }
+  
   printf("Instruction access time is %d, miss time is %d", I_accesses,I_misses);
   trace_uninit();
 
