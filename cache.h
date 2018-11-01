@@ -1,3 +1,4 @@
+// Names: Alex Blackson, Yuchao Wan, Nick West
 /* This file contains a functional simulator of an associative cache with LRU replacement*/
 #include <stdlib.h>
 #include <stdio.h>
