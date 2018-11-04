@@ -48,8 +48,21 @@ for (k=0 ; k< cp->assoc ; k++)
 {
   if(cp->blocks[index][k].LRU < cp->blocks[index][way].LRU) 
      cp->blocks[index][k].LRU = cp->blocks[index][k].LRU + 1 ;
+  // printf("index is %d   way is %d     value is %d\n",index, way, cp->blocks[index][k].LRU);
 }
 cp->blocks[index][way].LRU = 0 ;
+}
+
+int data_updateLRU(struct cache_t *d_cache ,int index, int way)
+{
+int k ;
+for (k=0 ; k< d_cache->assoc ; k++) 
+{
+  if(d_cache->blocks[index][k].LRU < d_cache->blocks[index][way].LRU) 
+     d_cache->blocks[index][k].LRU = d_cache->blocks[index][k].LRU + 1 ;
+   //printf("index is %d  k is %d  k.value is %d  way is %d     value is %d\n",index, k,  d_cache->blocks[index][k].LRU, way, d_cache->blocks[index][k].LRU);
+}
+d_cache->blocks[index][way].LRU = 0 ;
 }
 
 
@@ -76,7 +89,7 @@ index = block_address - (tag * d_cache->nsets) ;
 for (i = 0; i < d_cache->assoc; i++) {	/* look for the requested block */
   if (d_cache->blocks[index][i].tag == tag && d_cache->blocks[index][i].valid == 1) 
   {
-  	updateLRU(d_cache, index, i) ;
+  	data_updateLRU(d_cache, index, i) ;
   	if (access_type == 1) d_cache->blocks[index][i].dirty = 1 ;
   	return(0);						/* a cache hit */
   }
@@ -96,16 +109,16 @@ if (search_write_buffer(*write_buffer, index, tag)==1) //hit
 
               //probably a dead code
 
-        for (way=0 ; way< d_cache->assoc ; way++)    /* look for an invalid entry */
-            if (d_cache->blocks[index][way].valid == 0)  /* found an invalid entry */
-           {
-              d_cache->blocks[index][way].valid = 1 ;
-              d_cache->blocks[index][way].tag = tag ;
-              deleteNode(write_buffer, index, tag);
-              updateLRU(d_cache, index, way);
-              d_cache->blocks[index][way].dirty = 1;
-              return(2);        
-            }
+                                                                  for (way=0 ; way< d_cache->assoc ; way++)    /* look for an invalid entry */
+                                                                   if (d_cache->blocks[index][way].valid == 0)  /* found an invalid entry */
+                                                                   {
+                                                                          d_cache->blocks[index][way].valid = 1 ;
+                                                                                      d_cache->blocks[index][way].tag = tag ;
+                                                                                                  deleteNode(write_buffer, index, tag);
+                                                                                                     data_updateLRU(d_cache, index, way);
+                                                                                                          d_cache->blocks[index][way].dirty = 1;
+                                                                                                                 return(2);        
+                                                                                   }
 
       // else if valid bit == 1; --full block
           //  find LRU block;
@@ -130,12 +143,12 @@ if (search_write_buffer(*write_buffer, index, tag)==1) //hit
           if (d_cache->blocks[index][i].LRU > max) {
             max = d_cache->blocks[index][i].LRU ;
             way = i ;
-
           }
+          
         // d_cache->blocks[index][way] is the LRU block
-       printf("way is %d\n", way);
+      // printf("way --------------is %d\n", way);
         d_cache->blocks[index][way].tag = tag;
-        updateLRU(d_cache, index, way);
+        data_updateLRU(d_cache, index, way);
 
         if (d_cache->blocks[index][way].dirty == 0)   
           {
@@ -155,7 +168,7 @@ if (search_write_buffer(*write_buffer, index, tag)==1) //hit
 
 
              /* the evicted block is dirty*/
-            printf("-----------haha----------");
+            //printf("-----------haha----------\n");
             deleteNode(write_buffer, index, tag);
             enqueue(write_buffer, index, tag, wb_max);
             d_cache->blocks[index][way].dirty = 1;
@@ -172,7 +185,8 @@ for (way=0 ; way< d_cache->assoc ; way++)		/* look for an invalid entry */
 
       d_cache->blocks[index][way].valid = 1 ;
       d_cache->blocks[index][way].tag = tag ;
-	    updateLRU(d_cache, index, way);
+      d_cache->blocks[index][way].LRU = way;
+	    data_updateLRU(d_cache, index, way);
 	    d_cache->blocks[index][way].dirty = 0;
       if(access_type == 1) d_cache->blocks[index][way].dirty = 1;
 	  return(1);				
@@ -186,12 +200,13 @@ for (way=0 ; way< d_cache->assoc ; way++)		/* look for an invalid entry */
     max = d_cache->blocks[index][i].LRU ;
     way = i ;
   }
+  //printf("---------------way is %d\n",way);
 // d_cache->blocks[index][way] is the LRU block
 
 
 
 
-updateLRU(d_cache, index, way);
+data_updateLRU(d_cache, index, way);
 if (d_cache->blocks[index][way].dirty == 0)		
   {											/* the evicted block is clean*/
     //######passs###########
@@ -204,7 +219,7 @@ else
     //######pass######
    										/* the evicted block is dirty*/
      //printf("maxxxxxxxxxxxxx is %d\n",wb_max);
-     printf("tag is %d\n",d_cache->blocks[index][way].tag);
+    // printf("tag is %d\n",d_cache->blocks[index][way].tag);
        int test=enqueue(write_buffer,index, d_cache->blocks[index][way].tag ,wb_max);
        // printf("queue--+++++++++++++++ is full %d\n",test==-1);
     
@@ -216,6 +231,10 @@ else
   }
 
 }
+
+
+
+
 
 
 
@@ -234,6 +253,11 @@ block_address = (address / cp->blocksize);
 tag = block_address / cp->nsets;
 index = block_address - (tag * cp->nsets) ;
 
+
+//printf("index is %d ,  tag is %d-------------\n", index, tag);
+
+ // printf("address is    %d\n",address);
+
 for (i = 0; i < cp->assoc; i++) { /* look for the requested block */
   if (cp->blocks[index][i].tag == tag && cp->blocks[index][i].valid == 1) 
   {
@@ -248,6 +272,7 @@ for (way=0 ; way< cp->assoc ; way++)    /* look for an invalid entry */
    {
       cp->blocks[index][way].valid = 1 ;
       cp->blocks[index][way].tag = tag ;
+      cp->blocks[index][way].LRU = way;
     updateLRU(cp, index, way);
     cp->blocks[index][way].dirty = 0;
       if(access_type == 1) cp->blocks[index][way].dirty = 1 ;

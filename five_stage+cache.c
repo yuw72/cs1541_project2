@@ -44,7 +44,7 @@ int main(int argc, char **argv)
 
   // here you should extract the cache parameters from the configuration file 
   unsigned int I_size = 2 ; 
-  unsigned int I_assoc = 4;
+  unsigned int I_assoc = 2;
   unsigned int I_bsize = 16; 
   unsigned int miss_penalty = 10;
   unsigned int wb_penalty = 1;
@@ -58,7 +58,8 @@ int main(int argc, char **argv)
   int count=miss_penalty;
   int busy_writeBack=0;
   int availability=0;
-
+  int D_availability=0;
+  int I_availability=0;
 
 
 
@@ -75,7 +76,7 @@ int main(int argc, char **argv)
   trace_init();
   struct cache_t *I_cache;
   struct cache_t *D_cache;
-  //I_cache = cache_create(I_size, I_bsize, I_assoc); 
+  I_cache = cache_create(I_size, I_bsize, I_assoc); 
   D_cache = cache_create(D_size, D_bsize, D_assoc);
   node_t *write_buffer = NULL;
   while(1) {
@@ -98,21 +99,55 @@ int main(int argc, char **argv)
 	      EX = ID;
 	      ID = IF;
 	  }
+	  I_availability = 1;
       if(!size&& stall==0){    /* if no more instructions in trace, reduce flush_counter */
         flush_counter--;
       }
-	  else {	
-	  	 //instruction cache access
+	  else {
+	     	if(stall==0) memcpy(&IF, tr_entry, sizeof(IF));	
+	  	    //instruction cache access
+	     	if(busy_writeBack == 0)
+	     	{
+
+	     		int I_level = inst_cache_access(I_cache, IF.PC, 0);
+	     		//printf("I_level is %d \n",I_level);
+	     		if(I_level == 0 )  I_availability = 1;
+	     		else
+	     		{
+	     			I_availability =0;
+	     			cycle_number = cycle_number + miss_penalty;
+	     		}
+	     		printf("cycle number is %d\n", cycle_number);
+	     	}
+	     	else if(busy_writeBack == 1 && stall == 0)
+	     	{
+
+//printf("--------------------------------------");
+	     		 int I_level = inst_cache_access(I_cache, IF.PC, 0);
+	     		if(I_level == 0)
+	     		{
+	     			I_availability = 1;
+	     		}
+	     		else
+	     		{
+	     			I_availability = 0;
+	     			cycle_number = cycle_number+ miss_penalty;
+	     		}
+	     	}
 	  }
+	  //#################Data cache#############################################################
+
+
+
+	  
+
 	  if(flush_counter > 0 )
 	  {
-	  	if(stall==0) memcpy(&IF, tr_entry, sizeof(IF));
-	    
 	    if(busy_writeBack == 0)
      	{
      	// if()INST_cache_access
 			  if(MEM.type != ti_LOAD && MEM.type != ti_STORE)
-			  	 availability = 1;
+			  	 D_availability = 1;
 			  else
 			  {
 			  	  int access_type;
@@ -120,15 +155,15 @@ int main(int argc, char **argv)
 			  	  if(MEM.type == ti_STORE) access_type = 1;
 				  int level = data_cache_access(D_cache, &write_buffer, MEM.Addr, access_type, wb_max);
 				  if (level == 0)	//data cache L1 hit;
-					  availability = 1;
+					  D_availability = 1;
 				  else if(level == 2)
 				  {
-				   	  availability = 1;
+				   	  D_availability = 1;
 				   	  cycle_number += wb_penalty;
 				  }
 				  else
 				  {
-				  	availability = 0;
+				  	D_availability = 0;
 				  	cycle_number += wb_penalty + miss_penalty;
 				  	D_misses++;
 				  }
@@ -141,7 +176,7 @@ int main(int argc, char **argv)
 		 // if() inst_cache_access
 			//printf("----------inside L2-----------\n");
 			   if(MEM.type != ti_LOAD && MEM.type != ti_STORE)
-			  	 availability = 1;
+			  	 D_availability = 1;
 			  else
 			  {
 			  	  int access_type;
@@ -149,18 +184,25 @@ int main(int argc, char **argv)
 			  	  if(MEM.type == ti_STORE) access_type = 1;
 				  int level = data_cache_access(D_cache, &write_buffer, MEM.Addr, access_type, wb_max);
 				  if (level == 0)	//data cache L1 hit;
-					  availability = 1;
-				  else if(level == 2)
 				  {
-				   	  availability = 1;
-				   	  count = count-1;
-				   	  printf("yoyo level 2 count is %d--------",count);
+				  	 if(I_availability == 0) count--;
+					  D_availability = 1;
+				  }
+				  else if(level == 2) // write buffer
+				  {
+				   	  D_availability = 1;
+				   	  //printf("cycle_number befoeri s %d\n", cycle_number);
+				   	  if(count == 1) cycle_number = cycle_number + wb_penalty;
+				   	  else count = count-1;
+				   	  	//printf("count is %d\n",count);
+				   	  //printf("cycle_number now is s %d\n", cycle_number);
+				   	  //printf("yoyo level 2 count is %d--------",count);
 				   	  cycle_number += wb_penalty;
 				  }
 				  else
 				  {
 				  	//printf("-------I am here--------\n");
-				  	availability = 0;
+				  	D_availability = 0;
 				  	count = count -1 ;
 				  	if(count-1>=0)
 				  	{ 
@@ -179,11 +221,14 @@ int main(int argc, char **argv)
 				  D_accesses++;
 			  }	
 		}
-			//printf("buffer size is %d--------------------\n", get_size(write_buffer));
+		if(I_availability==1 && D_availability ==1) availability=1;
+		else availability==0;
+
+			
         if(availability == 1 && get_size(write_buffer)!=0)
         {
         	//printf("----------inside L2-----------\n");
-        	busy_writeBack =1;
+        	//busy_writeBack =1;
         	if(stall==1)
         	{
         		dequeue(&write_buffer);

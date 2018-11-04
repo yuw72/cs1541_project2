@@ -18,7 +18,7 @@ int enqueue(node_t **head, unsigned long index,unsigned long tag,int max) {
     new_node->next = *head;
     
     *head = new_node;
-    printf("---yoyo--- one come in, tag is %d\n",tag);
+    //printf("---yoyo--- one come in, tag is %d\n",tag);
     return 1;
 }
 
