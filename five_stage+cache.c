@@ -47,7 +47,7 @@ int main(int argc, char **argv)
   unsigned int I_assoc = 2;
   unsigned int I_bsize = 16; 
   unsigned int miss_penalty = 10;
-  unsigned int wb_penalty = 1;
+  unsigned int wb_penalty = 2;
   int wb_max = 1;  //write_buffer size
   unsigned int D_size = 2 ; 
   unsigned int D_assoc = 2;
@@ -117,29 +117,33 @@ int main(int argc, char **argv)
 	     			I_availability =0;
 	     			cycle_number = cycle_number + miss_penalty;
 	     		}
-	     		printf("cycle number is %d\n", cycle_number);
+	     		//printf("I_availability is %d\n", I_availability);
 	     	}
 	     	else if(busy_writeBack == 1 && stall == 0)
 	     	{
 
 //printf("--------------------------------------");
 	     		 int I_level = inst_cache_access(I_cache, IF.PC, 0);
+	     		 //printf("I_level is %d \n",I_level);
+	     	
 	     		if(I_level == 0)
 	     		{
 	     			I_availability = 1;
 	     		}
 	     		else
 	     		{
+	     			//printf("i am here");
 	     			I_availability = 0;
 	     			cycle_number = cycle_number+ miss_penalty;
+	     			//printf("cycle number is %d\n",cycle_number);
 	     		}
 	     	}
 	  }
 	  //#################Data cache#############################################################
 
+	 // printf("I_availability is %d \n",I_availability);
 
 
-	  
 
 	  if(flush_counter > 0 )
 	  {
@@ -176,59 +180,92 @@ int main(int argc, char **argv)
 		 // if() inst_cache_access
 			//printf("----------inside L2-----------\n");
 			   if(MEM.type != ti_LOAD && MEM.type != ti_STORE)
-			  	 D_availability = 1;
+			  	 {
+			  	   D_availability = 1;
+			  	   if(I_availability==0)
+			  	   count = count-1; // 1 instruction -- 1 count decrement
+			  	 }
 			  else
 			  {
 			  	  int access_type;
 			  	  if(MEM.type == ti_LOAD) access_type = 0;
 			  	  if(MEM.type == ti_STORE) access_type = 1;
 				  int level = data_cache_access(D_cache, &write_buffer, MEM.Addr, access_type, wb_max);
+			
 				  if (level == 0)	//data cache L1 hit;
 				  {
-				  	 if(I_availability == 0) count--;
+				  	 if(I_availability == 0) 
+				  	 	{
+				  	 		count = count -1; //  1 instruction -- 1 count decrement
+				  	 	}
 					  D_availability = 1;
+					//  printf("-------I am here--------\n");
 				  }
 				  else if(level == 2) // write buffer
 				  {
-				   	  D_availability = 1;
-				   	  //printf("cycle_number befoeri s %d\n", cycle_number);
-				   	  if(count == 1) cycle_number = cycle_number + wb_penalty;
-				   	  else count = count-1;
-				   	  	//printf("count is %d\n",count);
-				   	  //printf("cycle_number now is s %d\n", cycle_number);
-				   	  //printf("yoyo level 2 count is %d--------",count);
-				   	  cycle_number += wb_penalty;
+				  	D_availability = 1;
+
+				  	if(I_availability == 1)
+				  	{
+				   	  
+				   	  int old_count = count;
+				   	  count = count - wb_penalty;
+				      if(count <= 0) 
+				   	  	cycle_number = cycle_number + wb_penalty-(old_count-1);
+				   	}
+				   	else
+				   		count = count -1;//  1 instruction -- 1 count decrement
+
 				  }
 				  else
 				  {
-				  	//printf("-------I am here--------\n");
+				  	//printf("here--------");
 				  	D_availability = 0;
-				  	count = count -1 ;
-				  	if(count-1>=0)
-				  	{ 
-				  		count = count -1 ;
-				  		printf("----before cycle number is %d\n", cycle_number);
-				  		cycle_number = cycle_number + miss_penalty + wb_penalty;
-				  		printf("after cycle number is %d----\n", cycle_number);
-				  	}
-				  	//else if(count==1) cycle_number = cycle_number + miss_penalty;
-				  	else if (count == 0 )
+				  	if(I_availability == 1)
 				  	{
-				  	 cycle_number = cycle_number + miss_penalty+wb_penalty;
+					  	count = count -1 ;
+					  	int temp_val = count - wb_penalty;
+					  	if(temp_val >= 0 )
+					  	{ 
+					  		count = temp_val ;
+					  		printf("----before cycle number is %d\n", cycle_number);
+					  		cycle_number = cycle_number + miss_penalty + wb_penalty;
+					  		printf("after cycle number is %d----\n", cycle_number);
+					  	}				  	
+					  	else if (count == 0 )
+					  	{
+					  		
+					  	  cycle_number = cycle_number + miss_penalty + wb_penalty;
+					  	}
+					  	else
+					  	{
+					  		cycle_number = cycle_number + wb_penalty - count;
+					  		count = 0 ;
+					  	}
 				  	}
+				  	else // I_availability = 1;
+				  	  
 				  	D_misses++;
 				  }
 				  D_accesses++;
 			  }	
 		}
-		if(I_availability==1 && D_availability ==1) availability=1;
-		else availability==0;
 
+		/////####################busy L2################################
+
+
+		if(I_availability ==1 && D_availability ==1) 
+			availability=1;
+		else
+		    availability=0;
+
+	//	printf("I_avila = %d   availability = %d   get_size = %d   busy_writeBack = %d\n",I_availability ,availability, get_size(write_buffer), busy_writeBack);
 			
         if(availability == 1 && get_size(write_buffer)!=0)
         {
         	//printf("----------inside L2-----------\n");
-        	//busy_writeBack =1;
+
+        	busy_writeBack =1;
         	if(stall==1)
         	{
         		dequeue(&write_buffer);
@@ -243,27 +280,31 @@ int main(int argc, char **argv)
         	else
         	{
         		count = count - 1;
-			//printf("yoyo decrement--------- count is %d\n", count);
+			    //printf("yoyo decrement--------- count is %d\n", count);
+
         	}
-        	if(count == 0)
+        	if(count <= 0)
         	{
         		busy_writeBack = 0;
         		stall = 0;
         		dequeue(&write_buffer);
-        		availability = 0;
+        		
         		count = miss_penalty;
         	}
+        	//printf("count is %d\n",count);
         	
         }
 
         if(availability == 0 && busy_writeBack == 1)
         {
+        	//printf("count----------------- is %d\n", count);
         	stall = 1;
-        	availability = 1;
+        	I_availability = 1;
+        	D_availability = 1;
         }
 
 
-        //printf("availability = %d\n",availability);
+        
        // printf("count is %d\n",count );
 
 
@@ -271,12 +312,12 @@ int main(int argc, char **argv)
 
 
 	  }
-
+	 // printf("busy writeback is %d\n", busy_writeBack);
       //printf("==============================================================================\n");
       //
     }  
 
-	 if (trace_view_on && cycle_number >= 5 ) {/* print the executed instruction if trace_view_on=1 */
+	 if (trace_view_on && cycle_number >= 5 && stall==0 ) {/* print the executed instruction if trace_view_on=1 */
 		 switch (WB.type) {
 		 case ti_NOP:
 			 printf("[cycle %d] NOP:\n", cycle_number);
