@@ -228,9 +228,9 @@ int main(int argc, char **argv)
 					  	if(temp_val >= 0 )
 					  	{ 
 					  		count = temp_val ;
-					  		printf("----before cycle number is %d\n", cycle_number);
+					  		//printf("----before cycle number is %d\n", cycle_number);
 					  		cycle_number = cycle_number + miss_penalty + wb_penalty;
-					  		printf("after cycle number is %d----\n", cycle_number);
+					  		//printf("after cycle number is %d----\n", cycle_number);
 					  	}				  	
 					  	else if (count == 0 )
 					  	{
@@ -244,7 +244,10 @@ int main(int argc, char **argv)
 					  	}
 				  	}
 				  	else // I_availability = 1;
-				  	  
+				  	{
+ 						count = count -1;
+ 						cycle_number = cycle_number + miss_penalty;
+				  	}
 				  	D_misses++;
 				  }
 				  D_accesses++;
@@ -270,7 +273,7 @@ int main(int argc, char **argv)
         	{
         		dequeue(&write_buffer);
         		//printf("before cycle number is %d\n", cycle_number);
-        		printf("count is %d----------\n",count);
+        		//printf("count is %d----------\n",count);
         		cycle_number = cycle_number + count;
         		//printf("after cycle number is %d\n", cycle_number);
         		busy_writeBack = 0;
