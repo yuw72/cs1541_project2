@@ -183,7 +183,10 @@ int main(int argc, char **argv)
 			  	 {
 			  	   D_availability = 1;
 			  	   if(I_availability==0)
-			  	   count = count-1; // 1 instruction -- 1 count decrement
+			  	   {
+			  	     count = count-1; // 1 instruction -- 1 count decrement
+ 					 cycle_number = cycle_number + 1;
+			  	   }
 			  	 }
 			  else
 			  {
@@ -197,6 +200,7 @@ int main(int argc, char **argv)
 				  	 if(I_availability == 0) 
 				  	 	{
 				  	 		count = count -1; //  1 instruction -- 1 count decrement
+				  	 		cycle_number = cycle_number + 1;
 				  	 	}
 					  D_availability = 1;
 					//  printf("-------I am here--------\n");
@@ -214,12 +218,16 @@ int main(int argc, char **argv)
 				   	  	cycle_number = cycle_number + wb_penalty-(old_count-1);
 				   	}
 				   	else
+				   	{
+				   		cycle_number = cycle_number + 1;
 				   		count = count -1;//  1 instruction -- 1 count decrement
+				   	}
 
 				  }
 				  else
 				  {
 				  	//printf("here--------");
+				  	cycle_number = cycle_number + 1; //make up one cycle for the installing instruction
 				  	D_availability = 0;
 				  	if(I_availability == 1)
 				  	{
@@ -239,11 +247,12 @@ int main(int argc, char **argv)
 					  	}
 					  	else
 					  	{
+
 					  		cycle_number = cycle_number + wb_penalty - count;
-					  		count = 0 ;
+					  		
 					  	}
 				  	}
-				  	else // I_availability = 1;
+				  	else // I_availability = 0;
 				  	{
  						count = count -1;
  						cycle_number = cycle_number + miss_penalty;
@@ -300,7 +309,7 @@ int main(int argc, char **argv)
 
         if(availability == 0 && busy_writeBack == 1)
         {
-        	//printf("count----------------- is %d\n", count);
+        	printf("count----------------- is %d\n", count);
         	stall = 1;
         	I_availability = 1;
         	D_availability = 1;
