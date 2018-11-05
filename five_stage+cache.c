@@ -28,6 +28,7 @@ int main(int argc, char **argv)
   struct instruction IF, ID, EX, MEM, WB;
   size_t size;
   char *trace_file_name;
+  int prediction = 0;
   int trace_view_on = 0;
   int flush_counter = 4; //5 stage pipeline, so we have to move 4 instructions once trace is done
 
@@ -39,20 +40,60 @@ int main(int argc, char **argv)
     exit(0);
   }
 
+if(argc!=4)
+{
+	printf("wrong number----\n");
+	exit(1);
+}
   trace_file_name = argv[1];
-  if (argc == 3) trace_view_on = atoi(argv[2]) ;
+  prediction = atoi(argv[2]);
+  trace_view_on = atoi(argv[3]) ;
+  FILE *fp;
+   char buff[255];
 
+   fp = fopen("cache_config.txt", "r");
+   if(fp == NULL) 
+    {
+        printf("the file doesn't exist\n");
+        exit(0);
+    }
+   // fscanf(fp, "%s", buff);
+   // printf("1 : %s\n", buff );
+
+   fgets(buff, 255, (FILE*)fp);
+   unsigned int I_size = atoi(buff);
+   printf("1: %d\n", I_size );
+   
+   fgets(buff, 255, (FILE*)fp);
+   unsigned int I_assoc = atoi(buff);
+   printf("2: %d\n", I_assoc );
+
+   fgets(buff, 255, (FILE*)fp);
+   unsigned int D_size = atoi(buff);
+   printf("3: %d\n", D_size );
+   
+   fgets(buff, 255, (FILE*)fp);
+   unsigned int D_assoc = atoi(buff);
+   printf("4: %d\n", D_assoc );
+
+   fgets(buff, 255, (FILE*)fp);
+   unsigned int bsize = atoi(buff);
+   printf("5: %d\n", bsize );
+   
+   fgets(buff, 255, (FILE*)fp);
+   int wb_max = atoi(buff);
+   printf("6: %d\n", wb_max);
+
+   fgets(buff, 255, (FILE*)fp);
+   unsigned int miss_penalty= atoi(buff);
+  // printf("7: %d\n", miss_penalty);
+   fclose(fp);
+  
   // here you should extract the cache parameters from the configuration file 
-  unsigned int I_size = 2 ; 
-  unsigned int I_assoc = 2;
-  unsigned int I_bsize = 16; 
-  unsigned int miss_penalty = 10;
-  unsigned int wb_penalty = 2;
-  int wb_max = 1;  //write_buffer size
-  unsigned int D_size = 2 ; 
-  unsigned int D_assoc = 2;
-  unsigned int D_bsize = 16; 
-  unsigned int D_miss_penalty = 10;
+   unsigned int I_bsize = bsize; 
+   unsigned int wb_penalty = 1;
+   unsigned int D_bsize = bsize; 
+   unsigned int D_miss_penalty = miss_penalty;
 
   int stall=0;
   int count=miss_penalty;
@@ -60,8 +101,6 @@ int main(int argc, char **argv)
   int availability=0;
   int D_availability=0;
   int I_availability=0;
-
-
 
 
   fprintf(stdout, "\n ** opening file %s\n", trace_file_name);
@@ -79,8 +118,11 @@ int main(int argc, char **argv)
   I_cache = cache_create(I_size, I_bsize, I_assoc); 
   D_cache = cache_create(D_size, D_bsize, D_assoc);
   node_t *write_buffer = NULL;
+
   while(1) {
-    size = trace_get_item(&tr_entry);
+  	
+  	if(stall == 0) size = trace_get_item(&tr_entry);
+    
     if (!size && flush_counter==0) {  /* no more instructions (instructions) to simulate */
       //modify the statistics output format according to the project description
       printf("+ Simulation terminates at cycle : %u\n", cycle_number);
@@ -100,15 +142,20 @@ int main(int argc, char **argv)
 	      ID = IF;
 	  }
 	  I_availability = 1;
+
+	  if(D_size==0)  D_availability == 0;
+
       if(!size&& stall==0){    /* if no more instructions in trace, reduce flush_counter */
         flush_counter--;
       }
 	  else {
-	     	if(stall==0) memcpy(&IF, tr_entry, sizeof(IF));	
+	     if(stall==0) memcpy(&IF, tr_entry, sizeof(IF));	
 	  	    //instruction cache access
+
+	     if(I_size !=0)
+	     {	
 	     	if(busy_writeBack == 0)
 	     	{
-
 	     		int I_level = inst_cache_access(I_cache, IF.PC, 0);
 	     		//printf("I_level is %d \n",I_level);
 	     		if(I_level == 0 )  I_availability = 1;
@@ -116,7 +163,9 @@ int main(int argc, char **argv)
 	     		{
 	     			I_availability =0;
 	     			cycle_number = cycle_number + miss_penalty;
+	     			I_misses++;
 	     		}
+	     		I_accesses ++;
 	     		//printf("I_availability is %d\n", I_availability);
 	     	}
 	     	else if(busy_writeBack == 1 && stall == 0)
@@ -136,8 +185,13 @@ int main(int argc, char **argv)
 	     			I_availability = 0;
 	     			cycle_number = cycle_number+ miss_penalty;
 	     			//printf("cycle number is %d\n",cycle_number);
+	     			I_misses++;
 	     		}
+	     		I_accesses++;
 	     	}
+	     } 
+	     else 
+	     	I_accesses++;  
 	  }
 	  //#################Data cache#############################################################
 
@@ -145,15 +199,20 @@ int main(int argc, char **argv)
 
 
 
-	  if(flush_counter > 0 )
-	  {
+	if(flush_counter > 0 )
+	{
+      if(D_size != 0)
+      {
 	    if(busy_writeBack == 0)
      	{
      	// if()INST_cache_access
+			   
 			  if(MEM.type != ti_LOAD && MEM.type != ti_STORE)
 			  	 D_availability = 1;
 			  else
 			  {
+
+     			  if(stall==0) D_accesses++; 
 			  	  int access_type;
 			  	  if(MEM.type == ti_LOAD) access_type = 0;
 			  	  if(MEM.type == ti_STORE) access_type = 1;
@@ -171,7 +230,7 @@ int main(int argc, char **argv)
 				  	cycle_number += wb_penalty + miss_penalty;
 				  	D_misses++;
 				  }
-				  D_accesses++;
+				
 			  }
 		}
 		//############busy_writeBack#################
@@ -179,17 +238,20 @@ int main(int argc, char **argv)
 		{
 		 // if() inst_cache_access
 			//printf("----------inside L2-----------\n");
+
 			   if(MEM.type != ti_LOAD && MEM.type != ti_STORE)
 			  	 {
 			  	   D_availability = 1;
 			  	   if(I_availability==0)
 			  	   {
 			  	     count = count-1; // 1 instruction -- 1 count decrement
- 					 cycle_number = cycle_number + 1;
+ 					// cycle_number = cycle_number + 1;
 			  	   }
 			  	 }
 			  else
 			  {
+
+     			  if(stall==0) D_accesses++; 
 			  	  int access_type;
 			  	  if(MEM.type == ti_LOAD) access_type = 0;
 			  	  if(MEM.type == ti_STORE) access_type = 1;
@@ -200,7 +262,7 @@ int main(int argc, char **argv)
 				  	 if(I_availability == 0) 
 				  	 	{
 				  	 		count = count -1; //  1 instruction -- 1 count decrement
-				  	 		cycle_number = cycle_number + 1;
+				  	 		//cycle_number = cycle_number + 1;
 				  	 	}
 					  D_availability = 1;
 					//  printf("-------I am here--------\n");
@@ -227,7 +289,7 @@ int main(int argc, char **argv)
 				  else
 				  {
 				  	//printf("here--------");
-				  	cycle_number = cycle_number + 1; //make up one cycle for the installing instruction
+				  	//cycle_number = cycle_number + 1; //make up one cycle for the installing instruction
 				  	D_availability = 0;
 				  	if(I_availability == 1)
 				  	{
@@ -259,10 +321,12 @@ int main(int argc, char **argv)
 				  	}
 				  	D_misses++;
 				  }
-				  D_accesses++;
+				
 			  }	
+			 
 		}
-
+      
+     
 		/////####################busy L2################################
 
 
@@ -286,7 +350,7 @@ int main(int argc, char **argv)
         		cycle_number = cycle_number + count;
         		//printf("after cycle number is %d\n", cycle_number);
         		busy_writeBack = 0;
-        		stall=0;
+        		stall = 0;
         		count = miss_penalty;
         	}
         	else
@@ -318,15 +382,16 @@ int main(int argc, char **argv)
 
         
        // printf("count is %d\n",count );
-
-
-
-
-
-	  }
-	 // printf("busy writeback is %d\n", busy_writeBack);
-      //printf("==============================================================================\n");
-      //
+	   }
+	   else // D_size =0;
+       {
+       	 if(MEM.type == ti_LOAD || MEM.type == ti_STORE)
+       	 	 D_accesses++;
+       }
+	 } 
+	 
+	  //printf("==============================================================================\n");
+      
     }  
 
 	 if (trace_view_on && cycle_number >= 5 && stall==0 ) {/* print the executed instruction if trace_view_on=1 */
