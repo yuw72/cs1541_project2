@@ -401,7 +401,7 @@ if(argc!=4)
       
     }  
 
-	 if (trace_view_on && cycle_number >= 5 && stall==0) {/* print the executed instruction if trace_view_on=1 */
+	 if (trace_view_on && cycle_number >= 5 /*&& stall==0 */) {/* print the executed instruction if trace_view_on=1 */
 		 switch (WB.type) {
 		 case ti_NOP:
 			 printf("[cycle %d] NOP:\n", cycle_number);
@@ -447,5 +447,4 @@ if(argc!=4)
 
   exit(0);
 }
-
 
