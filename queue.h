@@ -1,144 +1,135 @@
-#include <stdio.h>
-#include <stdlib.h>
-
-typedef struct node {
-    unsigned long index;
-    unsigned long tag;
-    struct node *next;
-} node_t;
-
-int enqueue(node_t **head, unsigned long index,unsigned long tag,int max) {
-    //printf("get sizeeeeeeeeeeeeeeee is %d\n", get_size(head));
-    if(get_size(*head) >= max) return -1;
-    node_t *new_node = malloc(sizeof(node_t));
-    if (!new_node) return -1;
-
-    new_node->index = index;
-    new_node->tag = tag;
-    new_node->next = *head;
-    
-    *head = new_node;
-    //printf("---yoyo--- one come in, tag is %d\n",tag);
-    return 1;
-}
-
-int dequeue(node_t **head) {
-    //printf("I am dequeinggggggggggggggg\n");
-    node_t *current, *prev = NULL;
-    int retval = -1;
-
-    if (*head == NULL) return -1;
-
-    current = *head;
-    while (current->next != NULL) {
-        prev = current;
-        current = current->next;
-    }
-
-    retval = current->index;
-    free(current);
-    
-    if (prev)
-        prev->next = NULL;
-    else
-        *head = NULL;
-    
-    return retval;
-}
-
+// C program for index implementation of queue 
+#include <stdio.h> 
+#include <stdlib.h> 
+#include <limits.h> 
   
-int deleteNode(node_t **head, unsigned long index, unsigned long tag) 
+// A structure to represent a queue 
+struct Queue 
 { 
-    // Store head node 
-    node_t *prev = NULL;
-    node_t *current = *head; 
-    
-    if(*head == NULL) return -1;
-    if(current->index==index && current->tag == tag)
-    {
-        *head = current->next;
-        free(current);
-        return 1;
-    }
-
-    while (current!=NULL && (current->index != index || current->tag != tag)) 
-    { 
-        prev = current; 
-        current = current->next; 
-    }
-    if(current == NULL) return -1;
-    // Unlink the node from linked list 
-    prev->next = current->next; 
-    
-    free(current);  // Free memory 
-
+    int front, rear, size; 
+    unsigned capacity; 
+    int* index; 
+    int* tag;
+}; 
+  
+// function to create a queue of given capacity.  
+// It initializes size of queue as 0 
+struct Queue* createQueue(unsigned capacity) 
+{ 
+    struct Queue* queue = (struct Queue*) malloc(sizeof(struct Queue)); 
+    queue->capacity = capacity; 
+    queue->size = 0; 
+    queue->front =  0;
+    queue->rear = capacity - 1;  // This is important, see the enqueue 
+    queue->index = (int*) malloc(queue->capacity * sizeof(int)); 
+    queue->tag = (int*) malloc(queue->capacity * sizeof(int));
+    return queue; 
+} 
+  
+// Queue is full when size becomes equal to the capacity  
+int isFull(struct Queue* queue) 
+{  return (queue->size == queue->capacity);  } 
+  
+// Queue is empty when size is 0 
+int isEmpty(struct Queue* queue) 
+{  return (queue->size == 0); } 
+  
+// Function to add an item to the queue.   
+// It changes rear and size 
+int enqueue(struct Queue* queue, int indx, int tg) 
+{ 
+    if (isFull(queue)) 
+        return -1; 
+    queue->rear = (queue->rear + 1)%queue->capacity; 
+    queue->index[queue->rear] = indx;
+    queue->tag[queue->rear] = tg;
+    queue->size = queue->size + 1; 
+     //printf("%d - %d enqueued to queue\n", indx,tg); 
     return 1;
+   
+} 
+  
+// Function to remove an item from queue.  
+// It changes front and size 
+int dequeue(struct Queue* queue) 
+{ 
+    if (isEmpty(queue)) 
+        return INT_MIN; 
+
+
+    int item = queue->tag[queue->front]; 
+    //printf("%d - %d dequeued to queue\n", queue->index[queue->front], item);
+    queue->front = (queue->front + 1)%queue->capacity; 
+    queue->size = queue->size - 1; 
+     
+    return item; 
 } 
 
-int search_write_buffer(node_t *head, unsigned long index, unsigned long tag)
+int deleteNode(struct Queue* queue, int indx, int tg)
 {
-    node_t *current = head;
-    if(head==NULL) return -1;
-
-    while (current!=NULL ) 
+    int i;
+    int max = queue->size;
+    int position = search_write_buffer(queue, indx, tg);
+    if(position == -1) return -1;
+   //printf("%d - %d deleteNode to queue\n", queue->index[position], queue->tag[position]);
+    for(i=position-1; i>=0;i--)
     {
-        if(current->index == index && current->tag == tag) 
-        {
-            free(current);
-            return 1;
-        }
-        current = current->next; 
+        queue->index[i+1] = queue->index[i];
+        queue->tag[i+1] = queue-> tag[i];
+        
     }
-    free(current);
+    
+    queue->front = (queue->front + 1)%queue->capacity; 
+    queue->size = queue->size - 1; 
+    return 0;
+}
+// Function to get front of queue 
+int front(struct Queue* queue) 
+{ 
+    if (isEmpty(queue)) 
+        return INT_MIN; 
+    return queue->index[queue->front]; 
+} 
+  
+// Function to get rear of queue 
+int rear(struct Queue* queue) 
+{ 
+    if (isEmpty(queue)) 
+        return INT_MIN; 
+    return queue->index[queue->rear]; 
+} 
+  
+int search_write_buffer(struct Queue* queue, int indx2, int tg2) 
+{ 
+    int i;
+    int max = queue->size;
+    int front = queue->front;
+    for(i=front; i< front + max; i++)
+    {
+      int indx = queue->index[i];
+      int tg = queue->tag[i];
+      if(indx == indx2 && tg == tg2)
+        return i;
+    }
     return -1;
-}
+} 
 
-void print_list(node_t *head) {
-    node_t *current = head;
-
-    while (current != NULL) {
-        printf("%d %d\n", current->index,current->tag);
-        current = current->next;
+void print_list(struct Queue* queue) 
+{ 
+    int i;
+    int max = queue->size;
+    int front = queue->front;
+    
+    for(i=front; i<front+max; i++)
+    {
+      int indx = queue->index[i];
+      int tg = queue->tag[i];
+      //printf("index is %d   tag is %d \n",indx, tg);
     }
-}
+    return ;
+} 
 
-int get_size(node_t *head)
+int get_size(struct  Queue* queue)
 {
-  node_t *current = head;
-  int size=0;
-  while (current != NULL) {
-        size++;
-        current = current->next;
-    } 
-    free(current);
-  return size;    
+     return queue->size;
 }
-
-// int main() {
-//     node_t *head = NULL;
-//     int max=1;
-    
-//     int ret;
-
-//     int a=enqueue(&head, 11,100, max);
-//     int b= enqueue(&head, 22,110,max);
-//     int c=enqueue(&head, 33,120,max);
-//     int d=enqueue(&head, 44,130,max);
-//     printf("get_size is %d\n",get_size(head));
-//     //printf("a is %d b is %d  c is %d  d is %d\n", a, b ,c, d);
-//     print_list(head);
-    
-//     int delete = deleteNode(&head,11,100);
-//     printf("delete is %d\n", delete);
-//     // while ((ret=dequeue(&head)) > 0) {
-//     //     printf("dequeued %d\n", ret);
-//     // }
-//    // printf("done. head=%p\n", head);
-//      //enqueue(&head, 11,100,max);
-
-//     // int search = search_write_buffer(head, 11, 100);
-//     // printf("search is %d\n",search);
-//     print_list(head);
-//     printf("get_size is %d\n",get_size(head));
-//     return 0;
-// }
