@@ -12,10 +12,14 @@
 #include "CPU.h" 
 #include "hash.c"
 #include "cache.h"
+
+
 unsigned int I_accesses = 0;
 unsigned int I_misses = 0;
 unsigned int D_misses = 0;
 unsigned int D_accesses = 0;
+
+
 int data_hazard_condition(struct instruction IF)
 {
   return (IF.type == ti_RTYPE || IF.type == ti_STORE || IF.type == ti_BRANCH);
@@ -90,9 +94,6 @@ void overwrite_hashtable(struct instruction ID, int is_taken)
 
 int main(int argc, char **argv)
 {
- int sin=0;
- int cos=0;
-
   struct instruction *tr_entry;
   struct instruction IF, ID, EX, MEM, WB;
   size_t size;
@@ -127,8 +128,10 @@ int main(int argc, char **argv)
     printf("\nThere should be 3 arguments, please run again\n");
     exit(0);
   }
-   FILE *fp;
+
+  FILE *fp;
    char buff[255];
+
    fp = fopen("cache_config.txt", "r");
    if(fp == NULL) 
     {
@@ -160,7 +163,7 @@ int main(int argc, char **argv)
    
    fgets(buff, 255, (FILE*)fp);
    int wb_max = atoi(buff);
-   printf("6: %d\n", wb_max);
+   printf("6: wb_max is %d\n", wb_max);
 
    fgets(buff, 255, (FILE*)fp);
    unsigned int miss_penalty= atoi(buff);
@@ -179,6 +182,9 @@ int main(int argc, char **argv)
   int availability=0;
   int D_availability=0;
   int I_availability=0;
+  int N1 = 0;
+  int N2 = 0;
+
   fprintf(stdout, "\n ** opening file %s\n", trace_file_name);
 
   trace_fd = fopen(trace_file_name, "rb");
@@ -193,15 +199,13 @@ int main(int argc, char **argv)
   struct cache_t *D_cache;
   I_cache = cache_create(I_size, I_bsize, I_assoc); 
   D_cache = cache_create(D_size, D_bsize, D_assoc);
-  node_t *write_buffer = NULL;
+  struct Queue* write_buffer = createQueue(wb_max); 
 
   while(1) {
-    if ((!data_hazard)&& (!control_hazard)&& stall==0){
+    if ((!data_hazard)&& (!control_hazard) && stall == 0){
       size = trace_get_item(&tr_entry); /* put the instruction into a buffer */
     }
-
-    if((data_hazard == 1 || control_hazard == 1)  && size==0) flush_counter=4;
-
+     if((data_hazard == 1 || control_hazard == 1)  && size==0) flush_counter=4;
     data_hazard = 0;
     control_hazard = 0;
     if (!size && flush_counter==0) 
@@ -212,15 +216,15 @@ int main(int argc, char **argv)
     }
     else
     {              /* move the pipeline forward */
-      if(stall==0)  cycle_number++;
+     if(stall==0) cycle_number++;
       /* move instructions one stage ahead */
 
       // Data Hazard Detection
-      if(ID.type == ti_LOAD && stall == 0)
+      if (ID.type == ti_LOAD && stall==0)
       {
-        if(data_hazard_condition(IF))
+        if (data_hazard_condition(IF))
         {
-          if(ID.dReg == IF.sReg_a || ID.dReg == IF.sReg_b){
+          if (ID.dReg == IF.sReg_a || ID.dReg == IF.sReg_b){
             data_hazard = 1;
             WB = MEM;
             MEM = EX;
@@ -246,7 +250,7 @@ int main(int argc, char **argv)
       // Handling control hazards 
       if (prediction_method){
 
- ///////////////////////////////xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx///////////////////////////////////////////////////////////////////////////////////////       
+//#####################################################        
 
         if(ID.type == ti_BRANCH)
         {
@@ -293,10 +297,9 @@ int main(int argc, char **argv)
           }
         }
     }
+//##############################################
     else{
-//########################################################################################################
-
-        if (ID.type == ti_BRANCH && stall == 0)
+        if (ID.type == ti_BRANCH && stall==0)
         {
           if(branch_not_taken(IF,ID,size))
           {
@@ -315,7 +318,7 @@ int main(int argc, char **argv)
     }
       
 
-      if (!data_hazard && !control_hazard && stall == 0)
+      if (!data_hazard && !control_hazard && stall==0)
       {
 
         WB = MEM;
@@ -323,6 +326,9 @@ int main(int argc, char **argv)
         EX = ID;
         ID = IF;
       }     
+      
+      I_availability = 1;
+      if(D_size==0)  D_availability == 0;
 
       if(!size)
       {    /* if no more instructions in trace, reduce flush_counter */
@@ -330,7 +336,7 @@ int main(int argc, char **argv)
       }
       else
       {   /* copy trace entry into IF stage */
-        if (!data_hazard && (!control_hazard) && stall == 0)
+        if(!data_hazard && (!control_hazard) && stall == 0)
         {
           memcpy(&IF, tr_entry , sizeof(IF));
           if(I_size !=0)
@@ -349,158 +355,164 @@ int main(int argc, char **argv)
               I_accesses ++;
               //printf("I_availability is %d\n", I_availability);
             }
-          else if(busy_writeBack == 1 && stall == 0)
-          {
-
-  //printf("--------------------------------------");
-             int I_level = inst_cache_access(I_cache, IF.PC, 0);
-             //printf("I_level is %d \n",I_level);
-          
-            if(I_level == 0)
+            else if(busy_writeBack == 1 && stall == 0)
             {
-              I_availability = 1;
-            }
-            else
-            {
-              //printf("i am here");
-              I_availability = 0;
-              cycle_number = cycle_number+ miss_penalty;
-              //printf("cycle number is %d\n",cycle_number);
-              I_misses++;
-            }
-            I_accesses++;
-          }
-         } 
-         else 
-          I_accesses++; 
 
-        }
-      }     
-
-    if(flush_counter > 0 )
-    {
-      if(D_size != 0)
-      {
-      if(busy_writeBack == 0)
-      {
-      // if()INST_cache_access
-         
-        if(MEM.type != ti_LOAD && MEM.type != ti_STORE)
-           D_availability = 1;
-        else
-        {
-
-            if(stall==0) D_accesses++; 
-            int access_type;
-            if(MEM.type == ti_LOAD) access_type = 0;
-            if(MEM.type == ti_STORE) access_type = 1;
-          int level = data_cache_access(D_cache, &write_buffer, MEM.Addr, access_type, wb_max);
-          if (level == 0) //data cache L1 hit;
-            D_availability = 1;
-          else if(level == 2)
-          {
-              D_availability = 1;
-              cycle_number += wb_penalty;
-          }
-          else
-          {
-            D_availability = 0;
-            cycle_number += wb_penalty + miss_penalty;
-            D_misses++;
-          }
-        
-        }
-    }
-    //############busy_writeBack#################
-    else if(busy_writeBack==1 && stall==0)
-    {
-     // if() inst_cache_access
-      //printf("----------inside L2-----------\n");
-
-         if(MEM.type != ti_LOAD && MEM.type != ti_STORE)
-           {
-             D_availability = 1;
-             if(I_availability==0)
-             {
-               count = count-1; // 1 instruction -- 1 count decrement
-          // cycle_number = cycle_number + 1;
-             }
-           }
-        else
-        {
-
-            if(stall==0) D_accesses++; 
-            int access_type;
-            if(MEM.type == ti_LOAD) access_type = 0;
-            if(MEM.type == ti_STORE) access_type = 1;
-          int level = data_cache_access(D_cache, &write_buffer, MEM.Addr, access_type, wb_max);
-      
-          if (level == 0) //data cache L1 hit;
-          {
-             if(I_availability == 0) 
+    //printf("--------------------------------------");
+               int I_level = inst_cache_access(I_cache, IF.PC, 0);
+               //printf("I_level is %d \n",I_level);
+            
+              if(I_level == 0)
               {
-                count = count -1; //  1 instruction -- 1 count decrement
-                //cycle_number = cycle_number + 1;
-              }
-            D_availability = 1;
-          //  printf("-------I am here--------\n");
-          }
-          else if(level == 2) // write buffer
-          {
-            D_availability = 1;
-
-            if(I_availability == 1)
-            {
-              
-              int old_count = count;
-              count = count - wb_penalty;
-              if(count <= 0) 
-                cycle_number = cycle_number + wb_penalty-(old_count-1);
-            }
-            else
-            {
-              cycle_number = cycle_number + 1;
-              count = count -1;//  1 instruction -- 1 count decrement
-            }
-
-          }
-          else
-          {
-            //printf("here--------");
-            //cycle_number = cycle_number + 1; //make up one cycle for the installing instruction
-            D_availability = 0;
-            if(I_availability == 1)
-            {
-              count = count -1 ;
-              int temp_val = count - wb_penalty;
-              if(temp_val >= 0 )
-              { 
-                count = temp_val ;
-                //printf("----before cycle number is %d\n", cycle_number);
-                cycle_number = cycle_number + miss_penalty + wb_penalty;
-                //printf("after cycle number is %d----\n", cycle_number);
-              }           
-              else if (count == 0 )
-              {
-                
-                cycle_number = cycle_number + miss_penalty + wb_penalty;
+                I_availability = 1;
               }
               else
               {
-
-                cycle_number = cycle_number + wb_penalty - count;
-                
+                //printf("i am here");
+                I_availability = 0;
+                cycle_number = cycle_number+ miss_penalty;
+                //printf("cycle number is %d\n",cycle_number);
+                I_misses++;
               }
+              I_accesses++;
             }
-            else // I_availability = 0;
+           } 
+           else 
+            I_accesses++;  
+        }
+      }
+
+      if(flush_counter > 0 )
+      {
+        if(D_size != 0)
+        {
+        if(busy_writeBack == 0)
+        {
+        // if()INST_cache_access
+           
+          if(MEM.type != ti_LOAD && MEM.type != ti_STORE)
+             D_availability = 1;
+          else
+          {
+
+              if(stall==0) D_accesses++; 
+              int access_type;
+              if(MEM.type == ti_LOAD) access_type = 0;
+              if(MEM.type == ti_STORE) access_type = 1;
+              
+            int level = data_cache_access(D_cache, write_buffer, MEM.Addr, access_type, busy_writeBack, &N1, &N2);
+             
+            if (level == 0) //data cache L1 hit;
+              D_availability = 1;
+            else if(level == 2)
             {
-            count = count -1;
-            cycle_number = cycle_number + miss_penalty;
+                D_availability = 1;
+                cycle_number += wb_penalty;
             }
-            D_misses++;
+            else
+            {
+              D_availability = 0;
+              cycle_number += wb_penalty + miss_penalty;
+              D_misses++;
+            }
+          
           }
+      }
+      //############busy_writeBack#################
+      else if(busy_writeBack==1 && stall==0)
+      {
+       // if() inst_cache_access
+        //printf("----------inside L2-----------\n");
+
+           if(MEM.type != ti_LOAD && MEM.type != ti_STORE)
+             {
+               D_availability = 1;
+               if(I_availability==0)
+               {
+                 count = count-1; // 1 instruction -- 1 count decrement
+            // cycle_number = cycle_number + 1;
+               }
+             }
+          else
+          {
+
+              if(stall==0) D_accesses++; 
+              int access_type;
+              if(MEM.type == ti_LOAD) access_type = 0;
+              if(MEM.type == ti_STORE) access_type = 1;
+              
+            int level = data_cache_access(D_cache, write_buffer, MEM.Addr, access_type, busy_writeBack, &N1, &N2);
         
-        } 
+            if (level == 0) //data cache L1 hit;
+            {
+               if(I_availability == 0) 
+                {
+                  count = count -1; //  1 instruction -- 1 count decrement
+                  //cycle_number = cycle_number + 1;
+                }
+              D_availability = 1;
+            //  printf("-------I am here--------\n");
+            }
+            else if(level == 2) // write buffer
+            {
+              D_availability = 1;
+
+              if(I_availability == 1)
+              {
+                
+                int old_count = count;
+                count = count - wb_penalty;
+
+                if(count <= 0) 
+                  cycle_number = cycle_number + wb_penalty-(old_count-1);
+                else
+                  cycle_number = cycle_number + 1;
+              }
+              else
+              {
+                cycle_number = cycle_number + 1;
+                count = count -1;//  1 instruction -- 1 count decrement
+
+              }
+
+            }
+            else
+            {
+              //printf("here--------");
+              //cycle_number = cycle_number + 1; //make up one cycle for the installing instruction
+              D_availability = 0;
+              if(I_availability == 1)
+              {
+                count = count -1 ;
+                int temp_val = count - wb_penalty;
+                if(temp_val >= 0 )
+                { 
+                  count = temp_val ;
+                  //printf("----before cycle number is %d\n", cycle_number);
+                  cycle_number = cycle_number + miss_penalty + wb_penalty;
+                  //printf("after cycle number is %d----\n", cycle_number);
+                }           
+                else if (count == 0 )
+                {
+                  
+                  cycle_number = cycle_number + miss_penalty + wb_penalty;
+                }
+                else
+                {
+
+                  cycle_number = cycle_number + wb_penalty - count;
+                  
+                }
+              }
+              else // I_availability = 0;
+              {
+              count = count -1;
+              cycle_number = cycle_number + miss_penalty;
+              }
+              D_misses++;
+            }
+          
+          } 
        
     }
       
@@ -513,16 +525,17 @@ int main(int argc, char **argv)
     else
         availability=0;
 
-  //  printf("I_avila = %d   availability = %d   get_size = %d   busy_writeBack = %d\n",I_availability ,availability, get_size(write_buffer), busy_writeBack);
+    //rintf("I_avila = %d   availability = %d   get_size = %d   busy_writeBack = %d\n",I_availability ,availability, get_size(write_buffer), busy_writeBack);
       
-        if(availability == 1 && get_size(write_buffer)!=0)
+    //printf("isfull %d\n",isEmpty(write_buffer)!=0);
+        if(availability == 1 && isEmpty(write_buffer)==0)
         {
           //printf("----------inside L2-----------\n");
 
           busy_writeBack =1;
           if(stall==1)
           {
-            dequeue(&write_buffer);
+            dequeue(write_buffer);
             //printf("before cycle number is %d\n", cycle_number);
             //printf("count is %d----------\n",count);
             cycle_number = cycle_number + count;
@@ -534,14 +547,14 @@ int main(int argc, char **argv)
           else
           {
             count = count - 1;
-          //printf("yoyo decrement--------- count is %d\n", count);
+         // printf("yoyo decrement--------- count is %d\n", count);
 
           }
           if(count <= 0)
           {
             busy_writeBack = 0;
             stall = 0;
-            dequeue(&write_buffer);
+            dequeue(write_buffer);
             
             count = miss_penalty;
           }
@@ -551,7 +564,7 @@ int main(int argc, char **argv)
 
         if(availability == 0 && busy_writeBack == 1)
         {
-          printf("count----------------- is %d\n", count);
+          //printf("count----------------- is %d\n", count);
           stall = 1;
           I_availability = 1;
           D_availability = 1;
@@ -566,8 +579,8 @@ int main(int argc, char **argv)
          if(MEM.type == ti_LOAD || MEM.type == ti_STORE)
            D_accesses++;
        }
-        
-    }
+     } 
+  
 
     }  
 
@@ -611,11 +624,12 @@ int main(int argc, char **argv)
       }
     }
   } // end of while-loop
-printf("DATA access time is %d,  miss time is %d\n", D_accesses,D_misses);
-printf("I-cache accesses %u and misses %u\n", I_accesses, I_misses);
-printf("count inside is %d\n",sin);
-printf("count outside is %d\n",cos);
+  printf("I-cache accesses %u and misses %u\n", I_accesses, I_misses);
+  printf("DATA access time is %d,  miss time is %d\n", D_accesses,D_misses);
+  printf("N1 is %d\n", N1);
+  printf("N2 is %d\n", N2);
   trace_uninit();
 
   exit(0);
 }
+
