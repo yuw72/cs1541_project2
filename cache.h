@@ -66,7 +66,7 @@ d_cache->blocks[index][way].LRU = 0 ;
 }
 
 
-int data_cache_access(struct cache_t *d_cache, struct Queue *write_buffer, unsigned long address, int access_type, int busy_writeBack, int *N1, int *N2/*0 for read, 1 for write*/)
+int data_cache_access(struct cache_t *d_cache, struct Queue *write_buffer, unsigned long address, int access_type, int busy_writeBack, int *N1, int *N2, int *N3, int *L2_miss/*0 for read, 1 for write*/)
 //returns 0 (if a hit), 1 (if its found in L2) or
 //2 (if it is found in write buffer)
 {
@@ -180,6 +180,8 @@ if (search_write_buffer(write_buffer, index, tag) != -1) //hit
 }
 
 /* a cache miss */
+*L2_miss = *L2_miss + 1;
+
 for (way=0 ; way< d_cache->assoc ; way++)		/* look for an invalid entry */
     if (d_cache->blocks[index][way].valid == 0)	/* found an invalid entry */
 	 {
@@ -224,6 +226,7 @@ else
      //printf("maxxxxxxxxxxxxx is %d\n",wb_max);
     // printf("tag is %d\n",d_cache->blocks[index][way].tag);
        int wb_isFull=enqueue(write_buffer,index, d_cache->blocks[index][way].tag);
+       *N3 = *N3 + 1;
        if(wb_isFull == -1)
        {
           *N2 = *N2 + 1;
@@ -244,7 +247,7 @@ else
 
 
 
-int inst_cache_access(struct cache_t *cp, unsigned long address, int access_type /*0 for read, 1 for write*/)
+int inst_cache_access(struct cache_t *cp, unsigned long address, int access_type, int *L2_miss /*0 for read, 1 for write*/)
 //returns 0 (if a hit), 1 (if a miss but no dirty block is writen back) or
 //2 (if a miss and a dirty block is writen back)
 {
@@ -273,6 +276,8 @@ for (i = 0; i < cp->assoc; i++) { /* look for the requested block */
   }
 }
 /* a cache miss */
+
+ *L2_miss = *L2_miss + 1;
 for (way=0 ; way< cp->assoc ; way++)    /* look for an invalid entry */
     if (cp->blocks[index][way].valid == 0)  /* found an invalid entry */
    {
