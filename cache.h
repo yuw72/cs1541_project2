@@ -66,7 +66,7 @@ d_cache->blocks[index][way].LRU = 0 ;
 }
 
 
-int data_cache_access(struct cache_t *d_cache, node_t **write_buffer, unsigned long address, int access_type, int wb_max /*0 for read, 1 for write*/)
+int data_cache_access(struct cache_t *d_cache, struct Queue *write_buffer, unsigned long address, int access_type, int busy_writeBack/*0 for read, 1 for write*/)
 //returns 0 (if a hit), 1 (if its found in L2) or
 //2 (if it is found in write buffer)
 {
@@ -95,9 +95,10 @@ for (i = 0; i < d_cache->assoc; i++) {	/* look for the requested block */
   }
 }
 //////////////search buffer///////////////////////
-if (search_write_buffer(*write_buffer, index, tag)==1) //hit
+if (search_write_buffer(write_buffer, index, tag) != -1) //hit
 {
-  printf("here---in writebuffer---------------\n");
+ // *N1 = *N1 + 1;
+  //printf("here---in writebuffer---------------\n");
       // look for an invalid entry
 
       // if valid==0  -----empty block
@@ -114,7 +115,7 @@ if (search_write_buffer(*write_buffer, index, tag)==1) //hit
                                                                    {
                                                                           d_cache->blocks[index][way].valid = 1 ;
                                                                                       d_cache->blocks[index][way].tag = tag ;
-                                                                                                  deleteNode(write_buffer, index, tag);
+                                                                                                 if(busy_writeBack==0) deleteNode(write_buffer, index, tag);
                                                                                                      data_updateLRU(d_cache, index, way);
                                                                                                           d_cache->blocks[index][way].dirty = 1;
                                                                                                                  return(2);        
@@ -144,34 +145,35 @@ if (search_write_buffer(*write_buffer, index, tag)==1) //hit
             max = d_cache->blocks[index][i].LRU ;
             way = i ;
           }
-          
+         //printf("way is ===============%d\n", way); 
         // d_cache->blocks[index][way] is the LRU block
-      // printf("way --------------is %d\n", way);
-        d_cache->blocks[index][way].tag = tag;
+       //printf("way --------------is %d\n", way);
         data_updateLRU(d_cache, index, way);
-
         if (d_cache->blocks[index][way].dirty == 0)   
           {
-
             //////////pass////////////
-
             /* the evicted block is clean*/
             d_cache->blocks[index][way].dirty = 1;
-            deleteNode(write_buffer, index, tag);
+            if(busy_writeBack == 0) deleteNode(write_buffer, index, tag);
+            
+            d_cache->blocks[index][way].tag = tag;
             //printf("--------------------------tag now is+++++++++++++%d\n",d_cache->blocks[index][way].tag);
               
             return(2);
           }
         else
           {
-            /////! pass//////////
-
+            /////! pass/////////
 
              /* the evicted block is dirty*/
-            //printf("-----------haha----------\n");
-            deleteNode(write_buffer, index, tag);
-            enqueue(write_buffer, index, tag, wb_max);
+    
+            if(busy_writeBack == 0) 
+            {
+                deleteNode(write_buffer, index, tag);
+                enqueue(write_buffer, index, d_cache->blocks[index][way].tag);
+            }
             d_cache->blocks[index][way].dirty = 1;
+            d_cache->blocks[index][way].tag = tag;
             return(2);
           }
 
@@ -212,6 +214,7 @@ if (d_cache->blocks[index][way].dirty == 0)
     //######passs###########
   	d_cache->blocks[index][way].dirty = access_type;
   	d_cache->blocks[index][way].tag = tag;
+
     return(1);
   }
 else
@@ -220,13 +223,16 @@ else
    										/* the evicted block is dirty*/
      //printf("maxxxxxxxxxxxxx is %d\n",wb_max);
     // printf("tag is %d\n",d_cache->blocks[index][way].tag);
-       int test=enqueue(write_buffer,index, d_cache->blocks[index][way].tag ,wb_max);
-       // printf("queue--+++++++++++++++ is full %d\n",test==-1);
-    
+       int wb_isFull=enqueue(write_buffer,index, d_cache->blocks[index][way].tag);
+       if(wb_isFull == -1)
+       {
+         // *N2 = *N2 + 1;
+       }
      //else
       // write_in_L2() 
 	d_cache->blocks[index][way].dirty = access_type;
 	d_cache->blocks[index][way].tag = tag;
+  
   return(1);
   }
 
