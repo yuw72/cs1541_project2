@@ -630,8 +630,8 @@ int main(int argc, char **argv)
       }
     }
   } // end of while-loop
-  printf("L1 data cache:   [%d] accesses,   [%d] hits,  [%d] misses, [%.2f] miss rate, [%d] write backs \n", D_accesses, D_accesses - D_misses, D_misses,(float) D_misses/D_accesses, N3);
-  printf("I-cache accesses %u and misses %u\n", I_accesses, I_misses);
+  printf("L1 data cache:   [%u] accesses,   [%u] hits,  [%u] misses, [%.6f] miss rate, [%d] write backs \n", D_accesses, D_accesses - D_misses, D_misses,(float) D_misses/D_accesses, N3);
+  printf("L1 instruction cache:  [%u] accesses, [%u] hits, [%u] misses, [%.6f] miss rate \n", I_accesses, I_accesses - I_misses, I_misses, (float)I_misses/I_accesses );
   printf("L2 cache:  [%d] accesses \n", L2_miss);
   printf("write buffer: [%d] N1, [%d] N2\n", N1, N2);
 
